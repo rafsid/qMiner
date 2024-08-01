@@ -1,0 +1,10 @@
+
+### Explanation of Changes:
+
+1. **Error Handling**: Added a try-except block around the `requests.get` call to handle potential request exceptions.
+2. **User-Agent Header**: Added a `User-Agent` header to the request to mimic a browser.
+3. **Logging**: Added logging statements to provide information about the script's progress and any issues encountered.
+4. **Configuration File**: Replaced the hardcoded URL with a command-line argument using `argparse`.
+5. **Data Validation**: Added checks to ensure that all required elements are present before accessing their text.
+
+This updated code should be more robust and easier to debug.
