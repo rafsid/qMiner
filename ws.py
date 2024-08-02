@@ -16,6 +16,6 @@ response = requests.get(url, headers=HEADERS)
 soup = BeautifulSoup(response.text, "html.parser")
 
 script_tag = soup.find("script", id="__NEXT_DATA__")
-html = script_tag
+html = script_tag.string
 
 print(html)
