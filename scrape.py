@@ -1,4 +1,5 @@
 import time
+import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -16,16 +17,91 @@ from langchain_community.llms import OpenAI
 # Ensure you have Tesseract OCR installed and its path set correctly
 pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class MyHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith('.py'):
-            print('Restarting script...')
-            projects = scrape_html(url)
-            pdf_text = extract_pdf_text(pdf_url)
-            image_text = extract_image_text(image_url)
-            all_text = '\n\n'.join([project['Description'] for project in projects]) + '\n\n' + pdf_text + '\n\n' + image_text
-            summary = summarize_text(all_text)
-            print(summary)
+            logging.info('Restarting script...')
+            try:
+                projects = scrape_html(url)
+                pdf_text = extract_pdf_text(pdf_url)
+                image_text = extract_image_text(image_url)
+                all_text = '\n\n'.join([project['Description'] for project in projects]) + '\n\n' + pdf_text + '\n\n' + image_text
+                summary = summarize_text(all_text)
+                logging.info(summary)
+            except Exception as e:
+                logging.error(f"Error during processing: {e}")
+
+def scrape_html(url):
+    """
+    Function to scrape HTML content from a website.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        projects = []
+        # Adjust based on the specific structure of the website
+        for project in soup.find_all('div', class_='project-item'):
+            title = project.find('h2').text
+            description = project.find('p', class_='description').text
+            deadline = project.find('span', class_='deadline').text
+            projects.append({'Title': title, 'Description': description, 'Deadline': deadline})
+        return projects
+    except requests.RequestException as e:
+        logging.error(f"Error scraping HTML: {e}")
+        return []
+
+def extract_pdf_text(url):
+    """
+    Function to extract text from a PDF file.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        pdf = PdfReader(io.BytesIO(response.content))
+        text = ""
+        for page in pdf.pages:
+            text += page.extract_text()
+        return text
+    except requests.RequestException as e:
+        logging.error(f"Error downloading PDF: {e}")
+        return ""
+    except Exception as e:
+        logging.error(f"Error extracting text from PDF: {e}")
+        return ""
+
+def extract_image_text(url):
+    """
+    Function to extract text from an image using OCR.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        img = Image.open(io.BytesIO(response.content))
+        text = pytesseract.image_to_string(img)
+        return text
+    except requests.RequestException as e:
+        logging.error(f"Error downloading image: {e}")
+        return ""
+    except Exception as e:
+        logging.error(f"Error extracting text from image: {e}")
+        return ""
+
+def summarize_text(text):
+    """
+    Function to summarize text using LLM.
+    """
+    try:
+        prompt = f"Summarize the following text: {text}"
+        llm = OpenAI(api_key='your_openai_api_key')
+        summary = llm.generate(prompt)
+        return summary
+    except Exception as e:
+        logging.error(f"Error summarizing text: {e}")
+        return "Summary could not be generated."
 
 def scrape_html(url):
     """
@@ -74,6 +150,7 @@ def summarize_text(text):
 
 
 if __name__ == "__main__":
+    logging.info("Starting script...")
     event_handler = MyHandler()
     observer = Observer()
     observer.schedule(event_handler, path='.', recursive=True)
@@ -83,6 +160,9 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        logging.info("Stopping script...")
         observer.stop()
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
 
     observer.join()
