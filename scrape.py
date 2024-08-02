@@ -75,10 +75,27 @@ def extract_image_text(file):
         logging.error(f"Error extracting text from image: {e}")
         return ""
 
+OPENROUTER_API_KEY = "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"
+
 def summarize_text(text, api_key):
     try:
-        llm = OpenAI(api_key=api_key)
-        return llm.generate(f"Summarize the following text: {text}")
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        data = json.dumps({
+            "model": "deepseek/deepseek-chat",
+            "messages": [
+                { "role": "user", "content": f"Summarize the following text: {text}" }
+            ]
+        })
+        response = requests.post(url, headers=headers, data=data)
+        if response.status_code == 200:
+            return response.json().get("choices")[0].get("message").get("content")
+        else:
+            logging.error(f"Error summarizing text: {response.status_code} - {response.text}")
+            return "Summary could not be generated."
     except Exception as e:
         logging.error(f"Error summarizing text: {e}")
         return "Summary could not be generated."
