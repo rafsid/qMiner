@@ -33,6 +33,7 @@ class MyHandler(FileSystemEventHandler):
                 image_text = extract_image_text(image_url)
                 all_text = '\n\n'.join([project['Description'] for project in projects]) + '\n\n' + pdf_text + '\n\n' + image_text
                 summary = summarize_text(all_text)
+                save_to_file(summary, 'summary.txt')
                 logging.info(summary)
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
@@ -105,6 +106,17 @@ def summarize_text(text):
     except Exception as e:
         logging.error(f"Error summarizing text: {e}")
         return "Summary could not be generated."
+
+def save_to_file(content, filename):
+    """
+    Function to save content to a local file.
+    """
+    try:
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(content)
+        logging.info(f"Content saved to {filename}")
+    except Exception as e:
+        logging.error(f"Error saving content to file: {e}")
 
 def scrape_html(url):
     """
