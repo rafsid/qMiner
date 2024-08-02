@@ -7,52 +7,35 @@ from watchdog.events import FileSystemEventHandler
 
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 from PyPDF2 import PdfReader
 import pytesseract
 from PIL import Image
 import io
-import langchain
-import langchain_community
 from langchain_community.llms import OpenAI
 
-# Ensure you have Tesseract OCR installed and its path set correctly
+# Tesseract OCR setup
 pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
-# Set up logging
+# Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class MyHandler(FileSystemEventHandler):
+class FileModificationHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith('.py'):
             logging.info('Restarting script... Current working directory: %s', os.getcwd())
             try:
-                url = 'http://example.com'  # Define your URL here
-                pdf_url = 'http://example.com/document.pdf'  # Define your PDF URL here
-                image_url = 'http://example.com/image.jpg'  # Define your image URL here
                 html_content = """<your provided HTML snippet here>"""
                 scraped_content = scrape_html(html_content)
                 save_to_file(json.dumps(scraped_content, indent=4), 'scraped_content.json')
-                logging.info("Scraped content saved to scraped_content.json in directory: %s", os.getcwd())
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
 
 def scrape_html(html_content):
-    """
-    Function to scrape HTML content from a provided HTML snippet.
-    """
     try:
         soup = BeautifulSoup(html_content, 'html.parser')
-        content = {}
+        content = {'Main Title': soup.find('h1').text.strip() if soup.find('h1') else ''}
         
-        # Extract the main title
-        main_title_tag = soup.find('h1')
-        if main_title_tag:
-            content['Main Title'] = main_title_tag.text.strip()
-        
-        # Extract sections with class 'section'
-        sections = soup.find_all('section')
-        for section in sections:
+        for section in soup.find_all('section'):
             section_title_tag = section.find('h2')
             if section_title_tag:
                 section_title = section_title_tag.text.strip()
@@ -64,59 +47,43 @@ def scrape_html(html_content):
         logging.error(f"Error scraping HTML: {e}")
         return {}
 
-def extract_pdf_text(url):
-    """
-    Function to extract text from a PDF file.
-    """
+def extract_text_from_url(url, extractor_func):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        pdf = PdfReader(io.BytesIO(response.content))
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text()
-        return text
+        return extractor_func(io.BytesIO(response.content))
     except requests.RequestException as e:
-        logging.error(f"Error downloading PDF: {e}")
+        logging.error(f"Error downloading content: {e}")
         return ""
+    except Exception as e:
+        logging.error(f"Error extracting text: {e}")
+        return ""
+
+def extract_pdf_text(file):
+    try:
+        pdf = PdfReader(file)
+        return " ".join(page.extract_text() for page in pdf.pages)
     except Exception as e:
         logging.error(f"Error extracting text from PDF: {e}")
         return ""
 
-def extract_image_text(url):
-    """
-    Function to extract text from an image using OCR.
-    """
+def extract_image_text(file):
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        img = Image.open(io.BytesIO(response.content))
-        text = pytesseract.image_to_string(img)
-        return text
-    except requests.RequestException as e:
-        logging.error(f"Error downloading image: {e}")
-        return ""
+        img = Image.open(file)
+        return pytesseract.image_to_string(img)
     except Exception as e:
         logging.error(f"Error extracting text from image: {e}")
         return ""
 
-def summarize_text(text):
-    """
-    Function to summarize text using LLM.
-    """
+def summarize_text(text, api_key):
     try:
-        prompt = f"Summarize the following text: {text}"
-        llm = OpenAI(api_key='your_openai_api_key')
-        summary = llm.generate(prompt)
-        return summary
+        llm = OpenAI(api_key=api_key)
+        return llm.generate(f"Summarize the following text: {text}")
     except Exception as e:
         logging.error(f"Error summarizing text: {e}")
         return "Summary could not be generated."
 
 def save_to_file(content, filename):
-    """
-    Function to save content to a local file.
-    """
     try:
         with open(filename, 'w', encoding='utf-8') as file:
             file.write(content)
@@ -124,55 +91,9 @@ def save_to_file(content, filename):
     except Exception as e:
         logging.error(f"Error saving content to file: {e}")
 
-def scrape_html(url):
-    """
-    Function to scrape HTML content from a website.
-    """
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    projects = []
-    # Adjust based on the specific structure of the website
-    for project in soup.find_all('div', class_='project-item'):
-        title = project.find('h2').text
-        description = project.find('p', class_='description').text
-        deadline = project.find('span', class_='deadline').text
-        projects.append({'Title': title, 'Description': description, 'Deadline': deadline})
-    return projects
-
-def extract_pdf_text(url):
-    """
-    Function to extract text from a PDF file.
-    """
-    response = requests.get(url)
-    pdf = PdfReader(io.BytesIO(response.content))
-    text = ""
-    for page in pdf.pages:
-        text += page.extract_text()
-    return text
-
-def extract_image_text(url):
-    """
-    Function to extract text from an image using OCR.
-    """
-    response = requests.get(url)
-    img = Image.open(io.BytesIO(response.content))
-    text = pytesseract.image_to_string(img)
-    return text
-
-def summarize_text(text):
-    """
-    Function to summarize text using LLM.
-    """
-    prompt = f"Summarize the following text: {text}"
-    llm = OpenAI(api_key='your_openai_api_key')
-    summary = llm.generate(prompt)
-    return summary
-
-
-
 if __name__ == "__main__":
     logging.info("Starting script... Current working directory: %s", os.getcwd())
-    event_handler = MyHandler()
+    event_handler = FileModificationHandler()
     observer = Observer()
     observer.schedule(event_handler, path='.', recursive=True)
     observer.start()
@@ -182,8 +103,6 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         logging.info("Stopping script...")
+    finally:
         observer.stop()
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-
-    observer.join()
+        observer.join()
