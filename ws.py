@@ -9,14 +9,13 @@ HEADERS = {
     
     "Accept": "*/*", 
     "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Accept-Language:
-en-GB,en-US;q=0.9,en;q=0.8
+    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8"
 }
 
 
 soup = BeautifulSoup(response.text, "html.parser")
 
 script_tag = soup.find("script", id="__NEXT_DATA__")
-html = script_tag
+html = script_tag.string
 
 print(html)
