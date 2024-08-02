@@ -1,6 +1,7 @@
 import json
 import time
 import logging
+import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -24,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 class MyHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith('.py'):
-            logging.info('Restarting script...')
+            logging.info('Restarting script... Current working directory: %s', os.getcwd())
             try:
                 url = 'http://example.com'  # Define your URL here
                 pdf_url = 'http://example.com/document.pdf'  # Define your PDF URL here
@@ -32,7 +33,7 @@ class MyHandler(FileSystemEventHandler):
                 html_content = """<your provided HTML snippet here>"""
                 scraped_content = scrape_html(html_content)
                 save_to_file(json.dumps(scraped_content, indent=4), 'scraped_content.json')
-                logging.info("Scraped content saved to scraped_content.json")
+                logging.info("Scraped content saved to scraped_content.json in directory: %s", os.getcwd())
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
 
@@ -170,7 +171,7 @@ def summarize_text(text):
 
 
 if __name__ == "__main__":
-    logging.info("Starting script...")
+    logging.info("Starting script... Current working directory: %s", os.getcwd())
     event_handler = MyHandler()
     observer = Observer()
     observer.schedule(event_handler, path='.', recursive=True)
