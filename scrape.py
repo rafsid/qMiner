@@ -25,6 +25,9 @@ class MyHandler(FileSystemEventHandler):
         if event.src_path.endswith('.py'):
             logging.info('Restarting script...')
             try:
+                url = 'http://example.com'  # Define your URL here
+                pdf_url = 'http://example.com/document.pdf'  # Define your PDF URL here
+                image_url = 'http://example.com/image.jpg'  # Define your image URL here
                 projects = scrape_html(url)
                 pdf_text = extract_pdf_text(pdf_url)
                 image_text = extract_image_text(image_url)
