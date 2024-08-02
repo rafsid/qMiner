@@ -28,35 +28,39 @@ class MyHandler(FileSystemEventHandler):
                 url = 'http://example.com'  # Define your URL here
                 pdf_url = 'http://example.com/document.pdf'  # Define your PDF URL here
                 image_url = 'http://example.com/image.jpg'  # Define your image URL here
-                projects = scrape_html(url)
-                pdf_text = extract_pdf_text(pdf_url)
-                image_text = extract_image_text(image_url)
-                all_text = '\n\n'.join([project['Description'] for project in projects]) + '\n\n' + pdf_text + '\n\n' + image_text
-                summary = summarize_text(all_text)
-                save_to_file(summary, 'summary.txt')
-                logging.info(summary)
+                html_content = """<your provided HTML snippet here>"""
+                scraped_content = scrape_html(html_content)
+                save_to_file(json.dumps(scraped_content, indent=4), 'scraped_content.json')
+                logging.info("Scraped content saved to scraped_content.json")
             except Exception as e:
                 logging.error(f"Error during processing: {e}")
 
-def scrape_html(url):
+def scrape_html(html_content):
     """
-    Function to scrape HTML content from a website.
+    Function to scrape HTML content from a provided HTML snippet.
     """
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        projects = []
-        # Adjust based on the specific structure of the website
-        for project in soup.find_all('div', class_='project-item'):
-            title = project.find('h2').text
-            description = project.find('p', class_='description').text
-            deadline = project.find('span', class_='deadline').text
-            projects.append({'Title': title, 'Description': description, 'Deadline': deadline})
-        return projects
-    except requests.RequestException as e:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        content = {}
+        
+        # Extract the main title
+        main_title_tag = soup.find('h1')
+        if main_title_tag:
+            content['Main Title'] = main_title_tag.text.strip()
+        
+        # Extract sections with class 'section'
+        sections = soup.find_all('section')
+        for section in sections:
+            section_title_tag = section.find('h2')
+            if section_title_tag:
+                section_title = section_title_tag.text.strip()
+                section_content = section.text.replace(section_title, '').strip()
+                content[section_title] = section_content
+        
+        return content
+    except Exception as e:
         logging.error(f"Error scraping HTML: {e}")
-        return []
+        return {}
 
 def extract_pdf_text(url):
     """
