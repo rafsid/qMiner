@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from asgiref.wsgi import WsgiToAsgi
+from playwright.async_api import async_playwright
 
 load_dotenv()
 
@@ -68,62 +69,79 @@ async def init_db():
 async def is_internal_link(base_url, link):
     return urlparse(link).netloc == urlparse(base_url).netloc or not urlparse(link).netloc
 
+async def fetch_with_playwright(url):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        try:
+            await page.goto(url, timeout=60000)  # Set a timeout of 60 seconds
+            content = await page.content()
+            await browser.close()
+            return content
+        except Exception as e:
+            await browser.close()
+            logging.error(f"Error fetching {url} with Playwright: {str(e)}")
+            return None
+
 async def crawl_page(session, url, base_url, depth, max_depth):
     if depth > max_depth:
         return
 
     try:
-        async with session.get(url) as response:
-            if response.status != 200:
-                logging.warning(f"Failed to fetch {url}: HTTP {response.status}")
-                return
+        content = await fetch_with_playwright(url)
+        if content is None:
+            return []
 
-            content = await response.text()
-            soup = BeautifulSoup(content, 'html.parser')
+        soup = BeautifulSoup(content, 'html.parser')
 
-            internal_links = []
-            external_links = []
+        internal_links = []
+        external_links = []
 
-            for a_tag in soup.find_all('a', href=True):
-                link = urljoin(url, a_tag['href'])
-                if await is_internal_link(base_url, link):
-                    internal_links.append(link)
-                else:
-                    external_links.append(link)
+        for a_tag in soup.find_all('a', href=True):
+            link = urljoin(url, a_tag['href'])
+            if await is_internal_link(base_url, link):
+                internal_links.append(link)
+            else:
+                external_links.append(link)
 
-            async with aiosqlite.connect(DB_NAME) as db:
-                await db.execute("""
-                INSERT INTO crawls (url, depth, internal_links, external_links, title, crawled_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, (url, depth, json.dumps(internal_links), json.dumps(external_links),
-                      soup.title.string if soup.title else None, datetime.now().isoformat()))
-                await db.commit()
+        async with aiosqlite.connect(DB_NAME) as db:
+            await db.execute("""
+            INSERT INTO crawls (url, depth, internal_links, external_links, title, crawled_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (url, depth, json.dumps(internal_links), json.dumps(external_links),
+                  soup.title.string if soup.title else None, datetime.now().isoformat()))
+            await db.commit()
 
-            logging.info(f"Crawled: {url} (Depth: {depth})")
-            logging.info(f"Found {len(internal_links)} internal and {len(external_links)} external links")
+        logging.info(f"Crawled: {url} (Depth: {depth})")
+        logging.info(f"Found {len(internal_links)} internal and {len(external_links)} external links")
 
-            return internal_links
+        return internal_links
+
+    except UnicodeDecodeError as e:
+        logging.error(f"Encoding error while crawling {url}: {str(e)}")
+        return []
 
     except Exception as e:
         logging.error(f"Error crawling {url}: {str(e)}")
         return []
 
+
 async def crawl(base_url, max_depth, max_urls=MAX_URLS):
-    async with aiohttp.ClientSession() as session:
-        queue = [(base_url, 0)]
-        visited = set()
+    queue = [(base_url, 0)]
+    visited = set()
 
-        while queue and len(visited) < max_urls:
-            url, depth = queue.pop(0)
+    while queue and len(visited) < max_urls:
+        url, depth = queue.pop(0)
 
-            if url not in visited:
-                visited.add(url)
-                new_links = await crawl_page(session, url, base_url, depth, max_depth)
+        if url not in visited:
+            visited.add(url)
+            new_links = await crawl_page(None, url, base_url, depth, max_depth)
 
-                if new_links:
-                    for link in new_links:
-                        if link not in visited:
-                            queue.append((link, depth + 1))
+            if new_links:
+                for link in new_links:
+                    if link not in visited:
+                        queue.append((link, depth + 1))
 
 # API routes
 @app.route('/crawl', methods=['POST'])
