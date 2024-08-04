@@ -1,0 +1,74 @@
+# Build stage
+FROM python:3.12-slim-bookworm AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    chromium-driver \
+    fonts-liberation \
+    libnss3 \
+    libfreetype6 \
+    libharfbuzz0b \
+    ca-certificates \
+    fonts-freefont-ttf \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libcups2 \
+    libdbus-1-3 \
+    libgdk-pixbuf-2.0-0 \
+    libnspr4 \
+    libx11-6 \
+    libxshmfence1 \
+    wget \
+    xdg-utils \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uvicorn playwright
+
+# Install Playwright browsers
+RUN playwright install --with-deps chromium
+
+# Final stage
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Copy installed packages and Playwright browsers from builder stage
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /ms-playwright /ms-playwright
+
+# Copy only necessary system libraries
+COPY --from=builder \
+    /usr/lib/x86_64-linux-gnu/libdbus-1.so.3 \
+    /usr/lib/x86_64-linux-gnu/libexpat.so.1 \
+    /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 \
+    /usr/lib/x86_64-linux-gnu/
+
+# Copy the application code
+COPY . .
+
+# Expose port
+EXPOSE 5000
+
+# Run as non-root user
+RUN useradd -m myuser
+USER myuser
+
+# Define the command to run the application
+CMD ["uvicorn", "qminer:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
