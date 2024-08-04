@@ -1,13 +1,17 @@
+# Use an Alpine-based Python image
 FROM python:3.12-alpine
 
+# Set working directory
 WORKDIR /app
 
+# Copy requirements file
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install uvicorn
 
+# Install Python packages
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
 COPY . .
 
-EXPOSE 5000
-
-CMD ["uvicorn", "qminer:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
+# Run the application
+CMD ["flask", "run", "--host", "0.0.0.0"]
