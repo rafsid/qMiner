@@ -1,11 +1,43 @@
+# Dockerfile.dev
 FROM python:3.12-slim-bookworm
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up environment variable for architecture
+ARG TARGETARCH
+
+# Install Chrome based on architecture
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+        && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+        && apt-get update && apt-get install -y google-chrome-stable --no-install-recommends \
+        && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get update && apt-get install -y chromium --no-install-recommends \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Unsupported architecture: $TARGETARCH"; \
+        exit 1; \
+    fi
 
 WORKDIR /app
 
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+
+# Install playwright
+RUN pip install playwright && playwright install chromium
 
 COPY . .
 

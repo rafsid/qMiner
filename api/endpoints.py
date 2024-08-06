@@ -24,14 +24,23 @@ class CrawlRequest(BaseModel):
 
 @router.post('/crawl')
 async def start_crawl(request: CrawlRequest):
-    logger.debug(f"Received crawl request: {request}")
+    logger.info(f"Received crawl request: {request}")
 
     if not await is_valid_license(request.license_key):
         logger.warning(f"Invalid or expired license key: {request.license_key}")
         raise HTTPException(status_code=403, detail="Invalid or expired license key")
 
-    asyncio.create_task(crawl(request.url, request.max_depth, request.max_urls))
-    return {"message": "Crawl started successfully"}
+    # Start the crawl task
+    task = asyncio.create_task(crawl(request.url, request.max_depth, request.max_urls))
+    
+    # Wait for the crawl to complete
+    try:
+        crawled_urls = await task
+        logger.info(f"Crawl completed for {request.url}. Total URLs crawled: {crawled_urls}")
+        return {"message": f"Crawl completed successfully. Total URLs crawled: {crawled_urls}"}
+    except Exception as e:
+        logger.error(f"Error during crawl: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred during the crawl")
 
 @router.get('/results')
 async def get_crawl_results(license_key: str, page: int = 1, per_page: int = 20):

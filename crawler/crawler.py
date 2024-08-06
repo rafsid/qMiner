@@ -9,7 +9,6 @@ from playwright.async_api import async_playwright
 import aiosqlite
 from config import DB_NAME, MAX_URLS
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def is_internal_link(base_url, link):
@@ -35,6 +34,7 @@ async def crawl_page(url, base_url, depth, max_depth, semaphore):
     if depth > max_depth:
         return []
 
+    logger.info(f"Crawling: {url} (Depth: {depth})")
     content = await fetch_with_playwright(url, semaphore)
     if content is None:
         return []
@@ -68,6 +68,8 @@ async def crawl(base_url, max_depth, max_urls=MAX_URLS):
     visited = set()
     semaphore = asyncio.Semaphore(10)  # Limit concurrent requests
 
+    logger.info(f"Starting crawl for {base_url} with max depth {max_depth} and max URLs {max_urls}")
+
     while queue and len(visited) < max_urls:
         url, depth = queue.pop(0)
         if url not in visited:
@@ -77,4 +79,7 @@ async def crawl(base_url, max_depth, max_urls=MAX_URLS):
                 if link not in visited:
                     queue.append((link, depth + 1))
 
+        logger.info(f"Progress: Crawled {len(visited)} URLs")
+
     logger.info(f"Crawl completed. Visited {len(visited)} URLs.")
+    return len(visited)
