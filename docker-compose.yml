@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  qminer:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: qminer:dev
+    ports:
+      - "5000-6000:5000-6000"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - PYTHONUNBUFFERED=1
+    command: python run.py
