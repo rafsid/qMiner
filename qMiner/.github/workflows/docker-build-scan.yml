@@ -1,0 +1,19 @@
+name: Docker Build and Scan
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Run weekly on Sunday at midnight
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag qminer:$(date +%s)
+      - name: Run Docker Scout
+        run: docker scout cves qminer:$(date +%s)
